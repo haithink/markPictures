@@ -7,7 +7,7 @@
 #include "markPicturesDlg.h"
 #include "afxdialogex.h"
 
-#include "opencv.hpp"
+
 
 using namespace cv;
 
@@ -72,6 +72,8 @@ BEGIN_MESSAGE_MAP(CmarkPicturesDlg, CDialogEx)
 	ON_BN_CLICKED(IDC_BUTTON_NEXT, &CmarkPicturesDlg::OnBnClickedButtonNext)
 	ON_BN_CLICKED(IDC_BUTTON_NEXT, &CmarkPicturesDlg::OnBnClickedButtonNext)
 	ON_BN_CLICKED(IDC_BUTTON_PREV, &CmarkPicturesDlg::OnBnClickedButtonPrev)
+	ON_BN_CLICKED(IDC_BUTTON_FILEINFO, &CmarkPicturesDlg::OnBnClickedButtonFileinfo)
+	ON_BN_CLICKED(IDC_BUTTON_PATH, &CmarkPicturesDlg::OnBnClickedButtonPath)
 END_MESSAGE_MAP()
 
 
@@ -113,6 +115,10 @@ BOOL CmarkPicturesDlg::OnInitDialog()
 	::SetParent(hWnd, GetDlgItem(IDC_STATIC_PIC)->m_hWnd);
 	::ShowWindow(hParent, SW_HIDE);
 
+	// load the info 
+	void loadPicture(std::string infoFile, std::vector<headInfo> & infos);
+	loadPicture("E:\\DataContest\\yuncong\\yuncong_data\\Mall_train.txt", infos);
+	
 	return TRUE;  // 除非将焦点设置到控件，否则返回 TRUE
 }
 
@@ -167,22 +173,148 @@ HCURSOR CmarkPicturesDlg::OnQueryDragIcon()
 
 
 
+void loadPicture(std::string infoFile, std::vector<headInfo> & infos)
+{
+	infos.clear();
+
+	std::ifstream input(infoFile);
+
+	std::string line;
+	while (getline(input, line))
+	{
+		headInfo hi;
+		std::istringstream record(line);
+
+		record >> hi.imgName;
+
+		std::string strCnt;
+		record >> strCnt;
+		hi.cnt = std::stoi(strCnt);
+
+		for (int i = 0; i < hi.cnt; i++)
+		{
+			record >> strCnt;
+			//标志位(1) x y w h
+			cv::Rect rc;
+			record >> strCnt;
+			rc.x = std::stoi(strCnt);
+			record >> strCnt;
+			rc.y = std::stoi(strCnt);
+			record >> strCnt;
+			rc.width = std::stoi(strCnt);
+			record >> strCnt;
+			rc.height = std::stoi(strCnt);
+
+			hi.rects.push_back(rc);
+		}
+
+		infos.push_back(hi);
+	}
+	input.close();
+}
 // 下一张
+
+static int index = 0; // the index of current picture
 
 void CmarkPicturesDlg::OnBnClickedButtonNext()
 {
-	// TODO: 在此添加控件通知处理程序代码
+		// TODO: 在此添加控件通知处理程序代码
 	GetDlgItem(IDC_STATIC_PIC)->GetClientRect(&m_pic_rect);
 	// m_pic_rect.Width\
 
-	cv::Mat mat = imread("lena.jpg");
+	cv::Mat mat = imread(m_imgPath + infos[index].imgName);
+	// 画框
+	// cv::rectangle(mat, cv::Rect(0, 0, 100, 100), cv::Scalar(255, 0, 0), 2);
+	for (int i = 0; i < infos[index].cnt; i++)
+	{
+		cv::rectangle(mat, infos[index].rects[i],
+			cv::Scalar(0, 0, 255), 2);
+	}
+
 	cv::Mat mat2;
 	cv::resize(mat, mat2, cv::Size(m_pic_rect.Width(), m_pic_rect.Height()));
 	imshow("view", mat2);
+
+	index++;
 }
 
 
 void CmarkPicturesDlg::OnBnClickedButtonPrev()
 {
 	// TODO: 在此添加控件通知处理程序代码
+	// TODO: 在此添加控件通知处理程序代码
+	if (index > 0)
+	{
+		index -= 1;
+	}
+	GetDlgItem(IDC_STATIC_PIC)->GetClientRect(&m_pic_rect);
+	// m_pic_rect.Width\
+
+	cv::Mat mat = imread(m_imgPath + infos[index].imgName);
+	// 画框
+	// cv::rectangle(mat, cv::Rect(0, 0, 100, 100), cv::Scalar(255, 0, 0), 2);
+	for (int i = 0; i < infos[index].cnt; i++)
+	{
+		cv::rectangle(mat, infos[index].rects[i],
+			cv::Scalar(0, 0, 255), 2);
+	}
+
+	cv::Mat mat2;
+	cv::resize(mat, mat2, cv::Size(m_pic_rect.Width(), m_pic_rect.Height()));
+	imshow("view", mat2);
+}
+
+
+void CmarkPicturesDlg::OnBnClickedButtonFileinfo()
+{
+	// TODO: 在此添加控件通知处理程序代码
+	CString strFile = _T("");
+
+	CFileDialog dlgFile(TRUE, NULL, NULL, OFN_HIDEREADONLY, _T("Describe Files (*.txt)|*.txt|All Files (*.*)|*.*||"), NULL);
+
+	if (dlgFile.DoModal())
+	{
+		strFile = dlgFile.GetPathName();
+	}
+	//AfxMessageBox(strFile);
+	GetDlgItem(IDC_STATIC_INFO)->SetWindowText(strFile);
+	loadPicture(strFile.GetBuffer(), infos);
+
+	index = 0;
+}
+
+
+void CmarkPicturesDlg::OnBnClickedButtonPath()
+{
+	// TODO: 在此添加控件通知处理程序代码
+	char szPath[MAX_PATH];     //存放选择的目录路径 
+	CString str;
+
+	ZeroMemory(szPath, sizeof(szPath));
+
+	BROWSEINFO bi;
+	bi.hwndOwner = m_hWnd;
+	bi.pidlRoot = NULL;
+	bi.pszDisplayName = szPath;
+	bi.lpszTitle = "请选择需要图片所在目录，注意，这个要配合信息文件中文件名";
+	bi.ulFlags = 0;
+	bi.lpfn = NULL;
+	bi.lParam = 0;
+	bi.iImage = 0;
+	//弹出选择目录对话框
+	LPITEMIDLIST lp = SHBrowseForFolder(&bi);
+
+	if (lp && SHGetPathFromIDList(lp, szPath))
+	{
+		str.Format("选择的目录为 %s", szPath);
+		//AfxMessageBox(str);
+		GetDlgItem(IDC_STATIC_PICPATH)->SetWindowText(szPath);
+		m_imgPath.assign(szPath);
+		m_imgPath.append("\\");
+	}
+	else
+	{
+		AfxMessageBox("无效的目录，请重新选择");
+	}
+	index = 0;
 }
